@@ -1,4 +1,4 @@
-﻿// For more information see https://aka.ms/fsharp-console-apps
+﻿// TODO: Markov Chain Sentence Generator
 
 let sentences = [ ["#START"; "I"; "swim"; "."; "#END"]; ["#START"; "I"; "go"; "swimming"; "."; "#END"] ] ;
 
