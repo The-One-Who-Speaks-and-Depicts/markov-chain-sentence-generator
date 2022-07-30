@@ -2,7 +2,7 @@
 
 open System;
 
-let sentences = [ ["#START"; "I"; "swim"; "."; "#END"]; ["#START"; "I"; "go"; "swimming"; "."; "#END"] ] ;
+let sentences = [ ["#START"; "I"; "swim"; "."]; ["#START"; "I"; "go"; "swimming"; "."] ] ;
 
 let sentenceOutput(sentence: List<string>) =
     let mutable output = "";
@@ -13,13 +13,18 @@ let sentenceOutput(sentence: List<string>) =
         | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
     output
 
+let getNGram (tokenPos: int, n: int, sentence: List<string>) =
+    let mutable output : List<string> = [];
+    for i = tokenPos to tokenPos + n - 1 do
+        if i < sentence.Length then output <- output @ [sentence[i]] else output <- output @ ["#END"];
+    output
 
 
-for sentence in sentences do
-    printfn "%s" (sentenceOutput(sentence));
+let splitSentenceIntoNGrams (sentence: List<string>, n: int) =
+    let mutable output : List<List<string>> = [];
+    for i = 0 to sentence.Length - 1 do
+        output <- output @ [getNGram(i, n, sentence)];
+    output
 
-let rec nGramCollect (tokenPos: int, n: int, sentence: List<string>) =
-    let mutable output = sentence[tokenPos];
-    if n > 1 then String.concat " " [output; nGramCollect(tokenPos + 1, n - 1, sentence)] else output;
-
-printfn "%s" (nGramCollect(1, 2, sentences[0]));
+for ngram in splitSentenceIntoNGrams(sentences[0], 2) do
+    printfn "%s" (String.concat " " ngram)
