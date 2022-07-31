@@ -1,6 +1,7 @@
 ﻿// TODO: Markov Chain Sentence Generator
 
 open System;
+open System.Linq;
 
 
 let sentences = [ ["#START"; "I"; "swim"; "."]; ["#START"; "I"; "go"; "swimming"; "."] ] ;
@@ -43,6 +44,8 @@ type Chained =
     member this.CalculateProbability(overallAmount: float) =
         this.probability <- (float) this.value.Length / overallAmount;
 
+
+
 type Link =
     {mutable joined: List<Chained>;}
 
@@ -52,6 +55,11 @@ type Link =
             sequence.CalculateProbability(overallAmount);
 
     member this.ExistingTail (tail : List<string>) = List.tryFind(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value tail) this.joined;
+
+    member this.ReturnRandomWord() =
+        let random = Random().NextDouble();
+        let tails = List.map (fun x -> {value = x.value; probability = abs x.probability - random; amount = x.amount}) this.joined;
+        tails.Where(fun x -> x.probability.Equals(tails.Select(fun x -> x.probability).Max())).First().value;
 
 
 
@@ -70,8 +78,15 @@ let getChain(collectedSubchains: List<List<string>>) =
         link.Value.CalculateProbabilities();
     chain;
 
-for link in getChain(CollectSubchains(sentences, 2)) do
-    printfn "%s :" link.Key
-    for value in link.Value.joined do
-        printf "\t %s - %.2G\n" (String.concat " " value.value) value.probability;
-    printfn "";
+let rec last = function
+    | hd :: [] -> hd
+    | hd :: tl -> last tl
+    | _ -> failwith "Empty list."
+
+let generate(chain : Collections.Generic.Dictionary<string, Link>) =
+    let mutable finalSentence = ["#START"];
+    while not (String.Equals (last finalSentence, "#END")) do
+        finalSentence <- finalSentence @ (chain[last finalSentence].ReturnRandomWord());
+    finalSentence;
+
+printfn "%s" (SentenceOutput(generate(getChain(CollectSubchains(sentences, 2)))));
