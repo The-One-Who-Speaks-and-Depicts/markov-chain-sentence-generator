@@ -34,25 +34,36 @@ type Chained =
     mutable amount: int;
     mutable probability: float;}
 
+    member this.IncrementAmount() =
+        this.amount <- this.amount + 1;
+
+    member this.CalculateProbability(overallAmount: float) =
+        this.probability <- (float) this.value.Length / overallAmount;
+
 type Link =
     {mutable joined: List<Chained>;}
+
     member this.CalculateProbabilities() =
         let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) this.joined));
         for sequence in this.joined do
-            sequence.probability <- (float) sequence.value.Length / overallAmount;
+            sequence.CalculateProbability(overallAmount);
+
+    member this.ExistingTail (tail : List<string>) = List.tryFind(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value tail) this.joined;
+
 
 
 let getChain(collectedSubchains: List<List<string>>) =
     let mutable chain  = new Collections.Generic.Dictionary<string, Link>();
     for subchain in collectedSubchains do
-        let sequitur = [for i = 1 to subchain.Length - 1 do subchain[i]];
+        let tail = [for i = 1 to subchain.Length - 1 do subchain[i]];
         if (chain.Keys.Contains(subchain[0])) then
-            if List.exists(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value sequitur) chain[subchain[0]].joined then
-                (List.find(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value sequitur) chain[subchain[0]].joined).amount <- (List.find(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value sequitur) chain[subchain[0]].joined).amount + 1;
+            let listWithTail = chain[subchain[0]].ExistingTail(tail);
+            if listWithTail.IsSome then
+                listWithTail.Value.IncrementAmount();
             else
-                chain[subchain[0]].joined <- {value = sequitur; amount = 1; probability = 0} :: chain[subchain[0]].joined;
+                chain[subchain[0]].joined <- {value = tail; amount = 1; probability = 0} :: chain[subchain[0]].joined;
         else
-            chain[subchain[0]] <- {joined = [{value = sequitur; amount = 1; probability = 0}]};
+            chain[subchain[0]] <- {joined = [{value = tail; amount = 1; probability = 0}]};
     for link in chain do
         link.Value.CalculateProbabilities();
     chain;
