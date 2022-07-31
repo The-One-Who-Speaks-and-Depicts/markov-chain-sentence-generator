@@ -13,13 +13,13 @@ let SentenceOutput(sentence: List<string>) =
         | "," | ";" | ":" | "!" | "." | "?"  -> output <- String.concat "" [output; token]
         | "#START" | "#END" -> output <- output
         | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
-    output
+    output;
 
 let GetNGram (tokenPos: int, n: int, sentence: List<string>) =
     let mutable output : List<string> = [];
     for i = tokenPos to tokenPos + n - 1 do
         if i < sentence.Length then output <- output @ [sentence[i]] else output <- output @ ["#END"];
-    output
+    output;
 
 
 let CollectSubchains (sentences: List<List<string>>, n: int) =
@@ -27,7 +27,7 @@ let CollectSubchains (sentences: List<List<string>>, n: int) =
     for sentence in sentences do
         for i = 0 to sentence.Length - 1 do
             output <- output @ [GetNGram(i, n, sentence)];
-    output
+    output;
 
 type Chained =
     {mutable value: List<string>;
@@ -56,14 +56,14 @@ let getChain(collectedSubchains: List<List<string>>) =
     let mutable chain  = new Collections.Generic.Dictionary<string, Link>();
     for subchain in collectedSubchains do
         let tail = [for i = 1 to subchain.Length - 1 do subchain[i]];
-        if (chain.Keys.Contains(subchain[0])) then
-            let listWithTail = chain[subchain[0]].ExistingTail(tail);
+        if (chain.Keys.Contains(subchain.Head)) then
+            let listWithTail = chain[subchain.Head].ExistingTail(subchain.Tail);
             if listWithTail.IsSome then
                 listWithTail.Value.IncrementAmount();
             else
-                chain[subchain[0]].joined <- {value = tail; amount = 1; probability = 0} :: chain[subchain[0]].joined;
+                chain[subchain.Head].joined <- {value = subchain.Tail; amount = 1; probability = 0} :: chain[subchain.Head].joined;
         else
-            chain[subchain[0]] <- {joined = [{value = tail; amount = 1; probability = 0}]};
+            chain[subchain.Head] <- {joined = [{value = subchain.Tail; amount = 1; probability = 0}]};
     for link in chain do
         link.Value.CalculateProbabilities();
     chain;
