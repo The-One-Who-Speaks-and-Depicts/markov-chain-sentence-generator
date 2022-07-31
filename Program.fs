@@ -1,7 +1,6 @@
 ﻿// TODO: Markov Chain Sentence Generator
 
 open System;
-open System.Linq;
 
 
 let sentences = [ ["#START"; "I"; "swim"; "."]; ["#START"; "I"; "go"; "swimming"; "."] ] ;
@@ -59,7 +58,7 @@ type Link =
 let getChain(collectedSubchains: List<List<string>>) =
     let mutable chain  = new Collections.Generic.Dictionary<string, Link>();
     for subchain in collectedSubchains do
-        if (chain.Keys.Contains(subchain.Head)) then
+        if (List.tryFind(fun x -> String.Equals(x, subchain.Head)) (List.ofSeq(chain.Keys))).IsSome then
             let listWithTail = chain[subchain.Head].ExistingTail(subchain.Tail);
             if listWithTail.IsSome then
                 listWithTail.Value.IncrementAmount();
