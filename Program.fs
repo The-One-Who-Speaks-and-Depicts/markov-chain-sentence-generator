@@ -60,5 +60,5 @@ let getChain(collectedSubchains: List<List<string>>) =
 for link in getChain(CollectSubchains(sentences, 2)) do
     printfn "%s :" link.Key
     for value in link.Value.joined do
-        printf "\t %s - %.2f\n" (String.concat " " value.value) value.probability;
+        printf "\t %s - %.2G\n" (String.concat " " value.value) value.probability;
     printfn "";
