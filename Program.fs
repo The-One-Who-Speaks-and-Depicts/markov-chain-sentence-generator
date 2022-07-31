@@ -15,10 +15,14 @@ let SentenceOutput(sentence: List<string>) =
         | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
     output;
 
+let appendItem seqToAppendTo itemToAppend =
+    [ yield! seqToAppendTo
+      yield itemToAppend ]
+
 let GetNGram (tokenPos: int, n: int, sentence: List<string>) =
     let mutable output : List<string> = [];
     for i = tokenPos to tokenPos + n - 1 do
-        if i < sentence.Length then output <- output @ [sentence[i]] else output <- output @ ["#END"];
+        if i < sentence.Length then output <- appendItem output sentence[i] else output <- appendItem output "#END";
     output;
 
 
@@ -26,11 +30,11 @@ let CollectSubchains (sentences: List<List<string>>, n: int) =
     let mutable output : List<List<string>> = [];
     for sentence in sentences do
         for i = 0 to sentence.Length - 1 do
-            output <- output @ [GetNGram(i, n, sentence)];
+            output <- appendItem output (GetNGram(i, n, sentence));
     output;
 
 type Chained =
-    {mutable value: List<string>;
+    {value: List<string>;
     mutable amount: int;
     mutable probability: float;}
 
