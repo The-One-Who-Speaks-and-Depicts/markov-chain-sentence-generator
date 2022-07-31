@@ -55,7 +55,6 @@ type Link =
 let getChain(collectedSubchains: List<List<string>>) =
     let mutable chain  = new Collections.Generic.Dictionary<string, Link>();
     for subchain in collectedSubchains do
-        let tail = [for i = 1 to subchain.Length - 1 do subchain[i]];
         if (chain.Keys.Contains(subchain.Head)) then
             let listWithTail = chain[subchain.Head].ExistingTail(subchain.Tail);
             if listWithTail.IsSome then
