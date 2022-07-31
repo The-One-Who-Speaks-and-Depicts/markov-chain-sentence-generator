@@ -2,11 +2,12 @@
 
 open System;
 open System.Linq;
+open System.Collections.Generic;
 
 
 let sentences = [ ["#START"; "I"; "swim"; "."]; ["#START"; "I"; "go"; "swimming"; "."] ] ;
 
-let SentenceOutput(sentence: List<string>) =
+let SentenceOutput(sentence: list<string>) =
     let mutable output = "";
     for token in sentence do
         match token with
@@ -15,26 +16,26 @@ let SentenceOutput(sentence: List<string>) =
         | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
     output;
 
-let appendItem seqToAppendTo itemToAppend =
+let AppendItem seqToAppendTo itemToAppend =
     [ yield! seqToAppendTo
       yield itemToAppend ]
 
-let GetNGram (tokenPos: int, n: int, sentence: List<string>) =
-    let mutable output : List<string> = [];
+let GetNGram (tokenPos: int, n: int, sentence: list<string>) =
+    let mutable output : list<string> = [];
     for i = tokenPos to tokenPos + n - 1 do
-        if i < sentence.Length then output <- appendItem output sentence[i] else output <- appendItem output "#END";
+        if i < sentence.Length then output <- AppendItem output sentence[i] else output <- AppendItem output "#END";
     output;
 
 
-let CollectSubchains (sentences: List<List<string>>, n: int) =
-    let mutable output : List<List<string>> = [];
+let CollectSubchains (sentences: list<list<string>>) =
+    let mutable output : list<list<string>> = [];
     for sentence in sentences do
         for i = 0 to sentence.Length - 1 do
-            output <- appendItem output (GetNGram(i, n, sentence));
+            output <- AppendItem output (GetNGram(i, 2, sentence));
     output;
 
 type Chained =
-    {value: List<string>;
+    {value: list<string>;
     mutable amount: int;
     mutable probability: float;}
 
@@ -47,14 +48,14 @@ type Chained =
 
 
 type Link =
-    {mutable joined: List<Chained>;}
+    {mutable joined: list<Chained>;}
 
     member this.CalculateProbabilities() =
         let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) this.joined));
         for sequence in this.joined do
             sequence.CalculateProbability(overallAmount);
 
-    member this.ExistingTail (tail : List<string>) = List.tryFind(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value tail) this.joined;
+    member this.ExistingTail (tail : list<string>) = List.tryFind(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value tail) this.joined;
 
     member this.ReturnRandomWord() =
         let random = Random().NextDouble();
@@ -63,8 +64,8 @@ type Link =
 
 
 
-let getChain(collectedSubchains: List<List<string>>) =
-    let mutable chain  = new Collections.Generic.Dictionary<string, Link>();
+let GetChain(collectedSubchains: list<list<string>>) =
+    let mutable chain  = new Dictionary<string, Link>();
     for subchain in collectedSubchains do
         if (List.tryFind(fun x -> String.Equals(x, subchain.Head)) (List.ofSeq(chain.Keys))).IsSome then
             let listWithTail = chain[subchain.Head].ExistingTail(subchain.Tail);
@@ -78,15 +79,15 @@ let getChain(collectedSubchains: List<List<string>>) =
         link.Value.CalculateProbabilities();
     chain;
 
-let rec last = function
+let rec Last = function
     | hd :: [] -> hd
-    | hd :: tl -> last tl
+    | hd :: tl -> Last tl
     | _ -> failwith "Empty list."
 
-let generate(chain : Collections.Generic.Dictionary<string, Link>) =
+let Generate(chain : Dictionary<string, Link>) =
     let mutable finalSentence = ["#START"];
-    while not (String.Equals (last finalSentence, "#END")) do
-        finalSentence <- finalSentence @ (chain[last finalSentence].ReturnRandomWord());
+    while not (String.Equals (Last finalSentence, "#END")) do
+        finalSentence <- finalSentence @ (chain[Last finalSentence].ReturnRandomWord());
     finalSentence;
 
-printfn "%s" (SentenceOutput(generate(getChain(CollectSubchains(sentences, 2)))));
+printfn "%s" (sentences |> CollectSubchains |> GetChain |> Generate |> SentenceOutput);
