@@ -7,8 +7,6 @@ open System.IO;
 open FSharp.Data;
 open ShellProgressBar;
 
-let dir = "F:\\DB\\mcsg\\russian-troll-tweets";
-
 let AppendItem seqToAppendTo itemToAppend =
     [ yield! seqToAppendTo
       yield itemToAppend ]
@@ -20,8 +18,6 @@ let rec Last = function
 
 let tokenize (sentence: string) =
     "#START" :: List.ofSeq(sentence.Split(" "))
-
-
 
 let loadFiles(dir: string) =
     let totalTicks = DirectoryInfo(dir).GetFiles().Length;
@@ -48,8 +44,6 @@ let SentenceOutput(sentence: list<string>) =
         | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
     output;
 
-
-
 let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
     [for i = tokenPos to tokenPos + n - 1 do
         if i < sentence.Length then
@@ -57,8 +51,6 @@ let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
         else
             yield "#END"
     ]
-
-
 
 let CollectSubchains n sents =
     let sentences = List.ofSeq [for s in sents do List.ofSeq s];
@@ -87,8 +79,6 @@ type Chained =
 
     member this.CalculateProbability(overallAmount: float) =
         this.probability <- (float) this.value.Length / overallAmount;
-
-
 
 type Link =
     {mutable joined: list<Chained>;}
