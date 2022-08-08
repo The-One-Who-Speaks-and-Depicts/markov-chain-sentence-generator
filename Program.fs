@@ -1,4 +1,5 @@
 ﻿// TODO: Markov Chain Sentence Generator
+// TODO: include unit tests?
 
 open System;
 open System.Linq;
@@ -6,10 +7,6 @@ open System.Collections.Generic;
 open System.IO;
 open FSharp.Data;
 open ShellProgressBar;
-
-let AppendItem seqToAppendTo itemToAppend =
-    [ yield! seqToAppendTo
-      yield itemToAppend ]
 
 let rec Last = function
     | hd :: [] -> hd
