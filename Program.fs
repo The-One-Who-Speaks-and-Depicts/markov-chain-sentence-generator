@@ -59,7 +59,9 @@ let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
     ]
 
 
-let CollectSubchains (n: int, sentences: list<list<string>>) =
+
+let CollectSubchains n sents =
+    let sentences = List.ofSeq [for s in sents do List.ofSeq s];
     let totalTicks = sentences.Length;
     let options = new ProgressBarOptions ();
     options.ProgressCharacter <- '*';
@@ -74,8 +76,6 @@ let CollectSubchains (n: int, sentences: list<list<string>>) =
             ]
         ]
     );
-
-let CollectSubchainsFromNGrams x y = CollectSubchains(x, y);
 
 type Chained =
     {value: list<string>;
@@ -158,5 +158,5 @@ let main argv =
     let NGrams = match Int32.TryParse argv[1] with
                     | (true, int) -> Some(int)
                     | _ -> None
-    printfn "%s" (argv[0] |> loadFiles |> CollectSubchainsFromNGrams (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate |> SentenceOutput);
+    printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate |> SentenceOutput);
     0
