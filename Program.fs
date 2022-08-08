@@ -48,14 +48,18 @@ let SentenceOutput(sentence: list<string>) =
         | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
     output;
 
-let GetNGram (tokenPos: int, n: int, sentence: list<string>) =
-    let mutable output : list<string> = [];
-    for i = tokenPos to tokenPos + n - 1 do
-        if i < sentence.Length then output <- AppendItem output sentence[i] else output <- AppendItem output "#END";
-    output;
 
 
-let CollectSubchains (sentences: list<list<string>>) =
+let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
+    [for i = tokenPos to tokenPos + n - 1 do
+        if i < sentence.Length then
+            yield sentence[i]
+        else
+            yield "#END"
+    ]
+
+
+let CollectSubchains (n: int, sentences: list<list<string>>) =
     let totalTicks = sentences.Length;
     let options = new ProgressBarOptions ();
     options.ProgressCharacter <- '*';
@@ -66,10 +70,12 @@ let CollectSubchains (sentences: list<list<string>>) =
         [for sentence in sentences do
             bar.Tick();
             yield! [for i = 0 to sentence.Length do
-                    yield GetNGram(i, 2, sentence)
+                    yield GetNGram(i, n, sentence)
             ]
         ]
     );
+
+let CollectSubchainsFromNGrams x y = CollectSubchains(x, y);
 
 type Chained =
     {value: list<string>;
@@ -147,4 +153,10 @@ let Generate(chain : Chain) =
         finalSentence <- finalSentence @ (chain.links.Where(fun x -> x.Key = Last finalSentence).First().Value.ReturnRandomWord());
     finalSentence;
 
-printfn "%s" (dir |> loadFiles |> CollectSubchains |> GetFullChain |> GetChain |> Generate |> SentenceOutput);
+[<EntryPoint>]
+let main argv =
+    let NGrams = match Int32.TryParse argv[1] with
+                    | (true, int) -> Some(int)
+                    | _ -> None
+    printfn "%s" (argv[0] |> loadFiles |> CollectSubchainsFromNGrams (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate |> SentenceOutput);
+    0
