@@ -16,6 +16,8 @@ let rec Last = function
     | hd :: tl -> Last tl
     | _ -> failwith "Empty list."
 
+
+// TODO: separate tokenizer
 let tokenize (sentence: string) =
     "#START" :: List.ofSeq(sentence.Split(" "))
 
@@ -34,7 +36,7 @@ let loadFiles(dir: string) =
         ]
     );
 
-
+// TODO: output of parentheses
 let SentenceOutput(sentence: list<string>) =
     let mutable output = "";
     for token in sentence do
@@ -74,9 +76,6 @@ type Chained =
     mutable amount: int;
     mutable probability: float;}
 
-    member this.IncrementAmount() =
-        this.amount <- this.amount + 1;
-
     member this.CalculateProbability(overallAmount: float) =
         this.probability <- (float) this.value.Length / overallAmount;
 
@@ -88,13 +87,14 @@ type Link =
         for sequence in this.joined do
             sequence.CalculateProbability(overallAmount);
 
-    member this.ExistingTail (tail : list<string>) = List.tryFind(fun x -> List.forall2(fun elem1 elem2 -> String.Equals(elem1, elem2)) x.value tail) this.joined;
-
+    // TODO 1 : set seed with https://www.tutorialsteacher.com/articles/generate-random-numbers-in-csharp
+    // TODO 2 : not so random with (span of 0... prob1 ... prob2 (...) probN (...) 1)
     member this.ReturnRandomWord() =
         let random = Random().Next(0, this.joined.Length);
         this.joined[random].value;
 
 let GetFullChain(collectedSubchains: list<list<string>>) =
+    // TODO: don't violate DRY with bars!
     let totalTicks = collectedSubchains.Length;
     let options = new ProgressBarOptions ();
     options.ProgressCharacter <- '*';
@@ -133,7 +133,6 @@ let GetChain (fullChain: list<KeyValuePair<string, list<string>>>) =
         ]}
         chain.CalculateProbabilitiesForChain();
         chain;
-
     )
 
 
