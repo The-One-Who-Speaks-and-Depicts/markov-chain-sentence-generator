@@ -18,12 +18,16 @@ let rec Last = function
 let tokenize (sentence: string) =
     "#START" :: List.ofSeq(sentence.Split(" "))
 
+
+let InitializeBar ticks character inscription onBottom =
+    let options = new ProgressBarOptions();
+    options.ProgressCharacter <- character;
+    options.ProgressBarOnBottom <- onBottom;
+    new ProgressBar(ticks, inscription, options)
+
+
 let loadFiles(dir: string) =
-    let totalTicks = DirectoryInfo(dir).GetFiles().Length;
-    let options = new ProgressBarOptions ();
-    options.ProgressCharacter <- '*';
-    options.ProgressBarOnBottom <- true;
-    let bar = new ProgressBar(totalTicks, " files loaded", options);
+    let bar = InitializeBar (DirectoryInfo(dir).GetFiles().Length) '*' "files loaded" true;
     let barProgress = using (bar)
     (
         [for file in DirectoryInfo(dir).GetFiles() do
@@ -53,11 +57,7 @@ let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
 
 let CollectSubchains n sents =
     let sentences = List.ofSeq [for s in sents do List.ofSeq s];
-    let totalTicks = sentences.Length;
-    let options = new ProgressBarOptions ();
-    options.ProgressCharacter <- '*';
-    options.ProgressBarOnBottom <- true;
-    let bar = new ProgressBar(totalTicks, " sentences preprocessed", options);
+    let bar = InitializeBar sentences.Length '*' " sentences preprocessed." true;
     let barProgress = using (bar)
     (
         [for sentence in sentences do
@@ -91,12 +91,7 @@ type Link =
         this.joined[random].value;
 
 let GetFullChain(collectedSubchains: list<list<string>>) =
-    // TODO: don't violate DRY with bars!
-    let totalTicks = collectedSubchains.Length;
-    let options = new ProgressBarOptions ();
-    options.ProgressCharacter <- '*';
-    options.ProgressBarOnBottom <- true;
-    let bar = new ProgressBar(totalTicks, " subchains preprocessed", options);
+    let bar = InitializeBar collectedSubchains.Length '*' " subchains preprocessed." true;
     let flow = using (bar)
     (
         [for subchain in collectedSubchains do
@@ -114,11 +109,7 @@ type Chain =
 
 let GetChain (fullChain: list<KeyValuePair<string, list<string>>>) =
     let groupedPairs = fullChain.GroupBy(fun x -> x.Key);
-    let totalTicks = groupedPairs.Count();
-    let options = new ProgressBarOptions ();
-    options.ProgressCharacter <- '*';
-    options.ProgressBarOnBottom <- true;
-    let bar = new ProgressBar(totalTicks, " keys preprocessed", options);
+    let bar = InitializeBar (groupedPairs.Count()) '*' " keys preprocessed" true;
     let flow = using (bar)
     (
         let chain = {links = [for group in groupedPairs do
