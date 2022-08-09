@@ -133,16 +133,14 @@ let GetChain (fullChain: list<KeyValuePair<string, list<string>>>) =
     )
 
 
-let Generate(chain : Chain) =
-    let mutable finalSentence = ["#START"];
-    while ((not (String.Equals (Last finalSentence, "#END"))) && ([for i in finalSentence do i.Length].Sum() < 286)) do
-        finalSentence <- finalSentence @ (chain.links.Where(fun x -> x.Key = Last finalSentence).First().Value.ReturnRandomWord());
-    finalSentence;
+let rec Generate finalSentence (chain : Chain) =
+    if (String.Equals (Last finalSentence, "#END")) || ([for i in finalSentence do i.Length].Sum() < 286) then finalSentence
+    else Generate (finalSentence @ (chain.links.Where(fun x -> x.Key = Last finalSentence).First().Value.ReturnRandomWord())) chain;
 
 [<EntryPoint>]
 let main argv =
     let NGrams = match Int32.TryParse argv[1] with
                     | (true, int) -> Some(int)
                     | _ -> None
-    printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate |> SentenceOutput);
+    printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate ["#START"] |> SentenceOutput);
     0
