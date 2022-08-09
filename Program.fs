@@ -5,6 +5,7 @@ open System;
 open System.Linq;
 open System.Collections.Generic;
 open System.IO;
+open System.Text;
 open FSharp.Data;
 open ShellProgressBar;
 
@@ -15,6 +16,7 @@ let rec Last = function
 
 
 // TODO: separate tokenizer
+// TODO: href deletion
 let tokenize (sentence: string) =
     "#START" :: List.ofSeq(sentence.Split(" "))
 
@@ -38,14 +40,12 @@ let loadFiles(dir: string) =
     );
 
 // TODO: output of parentheses
-let SentenceOutput(sentence: list<string>) =
-    let mutable output = "";
-    for token in sentence do
-        match token with
-        | "," | ";" | ":" | "!" | "." | "?"  -> output <- String.concat "" [output; token]
-        | "#START" | "#END" -> output <- output
-        | _ -> output <- if String.Equals("", output) then token else String.concat " " [output; token]
-    output;
+let rec SentenceOutput (output : string) (sentence : list<string>) =
+    if sentence.Length = 0 then output else
+        match sentence.Head with
+        | "," | ";" | ":" | "!" | "." | "?" -> ((new StringBuilder()).Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString()
+        | "#START" | "#END" -> SentenceOutput output sentence.Tail
+        | _ -> if String.IsNullOrEmpty(output) then ((new StringBuilder()).Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString() else ((new StringBuilder()).Append(" ").Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString()
 
 let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
     [for i = tokenPos to tokenPos + n - 1 do
@@ -133,5 +133,5 @@ let main argv =
     let NGrams = match Int32.TryParse argv[1] with
                     | (true, int) -> Some(int)
                     | _ -> None
-    printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate ["#START"] |> SentenceOutput);
+    printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate ["#START"] |> SentenceOutput "");
     0
