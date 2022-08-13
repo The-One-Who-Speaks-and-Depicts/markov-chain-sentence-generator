@@ -135,17 +135,19 @@ let main argv =
     if (argv.Length > 0 && Directory.Exists(argv[0])) then
         let NGrams = if argv.Length > 1 then
                         match Int32.TryParse argv[1] with
-                        | (true, int) -> Some(int)
-                        | _ -> Some(2)
+                        | (true, int) -> Some(int).Value
+                        | _ -> 2
                         else
-                            Some(2)
+                            2
+        printfn "Using %d-grams." NGrams;
         let seed = if argv.Length > 2 then
                         match Int32.TryParse argv[2] with
                         | (true, int) -> Some(int)
                         | _ -> None
                         else
                             None
-        printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate ["#START"] seed |> SentenceOutput "");
+        if seed.IsSome then printfn "Set seed to %d." seed.Value;
+        printfn "%s" (argv[0] |> loadFiles |> CollectSubchains NGrams |> GetFullChain |> GetChain |> Generate ["#START"] seed |> SentenceOutput "");
     else
         printfn "%s" "No data provided."
     0
