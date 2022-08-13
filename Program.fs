@@ -45,7 +45,7 @@ let rec SentenceOutput (output : string) (sentence : list<string>) =
         match sentence.Head with
         | "," | ";" | ":" | "!" | "." | "?" -> ((new StringBuilder()).Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString()
         | "#START" | "#END" -> SentenceOutput output sentence.Tail
-        | _ -> if String.IsNullOrEmpty(output) then ((new StringBuilder()).Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString() else ((new StringBuilder()).Append(" ").Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString()
+        | _ -> ((new StringBuilder()).Append(sentence.Head).Append(" ").Append(SentenceOutput output sentence.Tail)).ToString()
 
 let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
     [for i = tokenPos to tokenPos + n - 1 do
