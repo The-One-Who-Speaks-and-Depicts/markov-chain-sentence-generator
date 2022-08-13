@@ -41,7 +41,6 @@ let loadFiles(dir: string) =
 
 // TODO: output of parentheses
 let rec SentenceOutput (output : string) (sentence : list<string>) =
-    printfn "%s" output;
     if sentence.Length = 0 then output else
         match sentence.Head with
         | "," | ";" | ":" | "!" | "." | "?" -> ((new StringBuilder()).Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString()
@@ -84,11 +83,12 @@ type Link =
         for sequence in this.joined do
             sequence.CalculateProbability(overallAmount);
 
-    // TODO 1 : set seed with https://www.tutorialsteacher.com/articles/generate-random-numbers-in-csharp
     // TODO 2 : not so random with (span of 0... prob1 ... prob2 (...) probN (...) 1)
-    member this.ReturnRandomWord() =
-        let random = Random().Next(0, this.joined.Length);
-        this.joined[random].value;
+    member this.ReturnRandomWord(seed: Option<int>) =
+        if (seed.IsSome) then
+            this.joined[Random(seed.Value).Next(0, this.joined.Length)].value
+        else
+            this.joined[Random().Next(0, this.joined.Length)].value
 
 let GetFullChain(collectedSubchains: list<list<string>>) =
     let bar = InitializeBar collectedSubchains.Length '*' " subchains preprocessed." true;
@@ -124,9 +124,10 @@ let GetChain (fullChain: list<KeyValuePair<string, list<string>>>) =
     )
 
 
-let rec Generate finalSentence (chain : Chain) =
-    if (String.Equals (Last finalSentence, "#END")) || ([for i in finalSentence do i.Length].Sum() < 286) then finalSentence
-    else Generate (finalSentence @ (chain.links.Where(fun x -> x.Key = Last finalSentence).First().Value.ReturnRandomWord())) chain;
+let rec Generate finalSentence (seed: Option<int>) (chain : Chain)  =
+    if (String.Equals (Last finalSentence, "#END")) || ([for i in finalSentence do i.Length].Sum() > 286) then
+        finalSentence
+    else Generate (finalSentence @ (chain.links.Where(fun x -> x.Key = Last finalSentence).First().Value.ReturnRandomWord(seed))) seed chain;
 
 [<EntryPoint>]
 let main argv =
@@ -134,11 +135,16 @@ let main argv =
         let NGrams = if argv.Length > 1 then
                         match Int32.TryParse argv[1] with
                         | (true, int) -> Some(int)
+                        | _ -> Some(2)
+                        else
+                            Some(2)
+        let seed = if argv.Length > 2 then
+                        match Int32.TryParse argv[2] with
+                        | (true, int) -> Some(int)
                         | _ -> None
                         else
-                            printfn "%s" "Using 2-grams by default."
-                            None;
-        printfn "%s" ((argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate ["#START"]).ToString());
+                            None
+        printfn "%s" (argv[0] |> loadFiles |> CollectSubchains (if NGrams.IsSome then NGrams.Value else 2) |> GetFullChain |> GetChain |> Generate ["#START"] seed |> SentenceOutput "");
     else
         printfn "%s" "No data provided."
     0
