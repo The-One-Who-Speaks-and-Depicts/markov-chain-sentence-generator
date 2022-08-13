@@ -1,5 +1,6 @@
 ﻿// TODO: Markov Chain Sentence Generator
 // TODO: include unit tests?
+// TODO: add detoxifier/toxicity scaler?
 
 open System;
 open System.Linq;
