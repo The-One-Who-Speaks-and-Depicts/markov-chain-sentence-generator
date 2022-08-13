@@ -1,6 +1,7 @@
 ﻿// TODO: Markov Chain Sentence Generator
 // TODO: include unit tests?
 // TODO: add detoxifier/toxicity scaler?
+// TODO: separate tokenizer
 
 open System;
 open System.Linq;
@@ -16,7 +17,6 @@ let rec Last = function
     | _ -> failwith "Empty list."
 
 
-// TODO: separate tokenizer
 // TODO: href/mention deletion
 let tokenize (sentence: string) =
     "#START" :: List.ofSeq(sentence.Split(" "))
