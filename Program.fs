@@ -3,19 +3,42 @@
 // TODO: add detoxifier/toxicity scaler?
 // TODO: separate tokenizer
 
-open System;
-open System.Linq;
-open System.Collections.Generic;
-open System.IO;
-open System.Text;
-open FSharp.Data;
-open ShellProgressBar;
+open System
+open System.Linq
+open System.Collections.Generic
+open System.IO
+open System.Text
+open FSharp.Data
+open ShellProgressBar
+open System.Net.Http
+open System.Text.Json
 
 let rec Last = function
     | hd :: [] -> hd
     | hd :: tl -> Last tl
     | _ -> failwith "Empty list."
 
+
+// TODO: alternative tokenizer and interfacing tokenizer
+
+type UDPipeResponse = {
+    model: string;
+    acknowledgements: list<string>;
+    result: string
+}
+
+let UDPipeResponseProcessor =
+    task {
+        use client = new HttpClient()
+        let! response =
+            client.GetStringAsync("http://lindat.mff.cuni.cz/services/udpipe/api/process?tokenizer&tagger&parser&data=Children go to school.")
+
+        let acquiredResult = JsonSerializer.Deserialize<UDPipeResponse> response
+
+        printfn $"Result: {acquiredResult.result}"
+    }
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
 
 // TODO: href/mention deletion
 let tokenize (sentence: string) =
@@ -132,6 +155,7 @@ let rec Generate finalSentence (seed: Option<int>) (chain : Chain)  =
 
 [<EntryPoint>]
 let main argv =
+    UDPipeResponseProcessor
     if (argv.Length > 0 && Directory.Exists(argv[0])) then
         let NGrams = if argv.Length > 1 then
                         match Int32.TryParse argv[1] with
