@@ -13,39 +13,19 @@ open ShellProgressBar
 open System.Net.Http
 open System.Text.Json
 
-let rec Last = function
+let rec last = function
     | hd :: [] -> hd
-    | hd :: tl -> Last tl
+    | hd :: tl -> last tl
     | _ -> failwith "Empty list."
 
 
 // TODO: alternative tokenizer and interfacing tokenizer
-
-type UDPipeResponse = {
-    model: string;
-    acknowledgements: list<string>;
-    result: string
-}
-
-let UDPipeResponseProcessor =
-    task {
-        use client = new HttpClient()
-        let! response =
-            client.GetStringAsync("http://lindat.mff.cuni.cz/services/udpipe/api/process?tokenizer&tagger&parser&data=Children go to school.")
-
-        let acquiredResult = JsonSerializer.Deserialize<UDPipeResponse> response
-
-        printfn $"Result: {acquiredResult.result}"
-    }
-    |> Async.AwaitTask
-    |> Async.RunSynchronously
-
 // TODO: href/mention deletion
 let tokenize (sentence: string) =
     "#START" :: List.ofSeq(sentence.Split(" "))
 
 
-let InitializeBar ticks character inscription onBottom =
+let initializeBar ticks character inscription onBottom =
     let options = new ProgressBarOptions();
     options.ProgressCharacter <- character;
     options.ProgressBarOnBottom <- onBottom;
@@ -53,7 +33,7 @@ let InitializeBar ticks character inscription onBottom =
 
 
 let loadFiles(dir: string) =
-    let bar = InitializeBar (DirectoryInfo(dir).GetFiles().Length) '*' "files loaded" true;
+    let bar = initializeBar (DirectoryInfo(dir).GetFiles().Length) '*' "files loaded" true;
     let barProgress = using (bar)
     (
         [for file in DirectoryInfo(dir).GetFiles() do
@@ -64,14 +44,14 @@ let loadFiles(dir: string) =
     );
 
 // TODO: output of parentheses
-let rec SentenceOutput (output : string) (sentence : list<string>) =
+let rec sentenceOutput (output : string) (sentence : list<string>) =
     if sentence.Length = 0 then output else
         match sentence.Head with
-        | "," | ";" | ":" | "!" | "." | "?" -> ((new StringBuilder()).Append(sentence.Head).Append(SentenceOutput output sentence.Tail)).ToString()
-        | "#START" | "#END" -> SentenceOutput output sentence.Tail
-        | _ -> ((new StringBuilder()).Append(sentence.Head).Append(" ").Append(SentenceOutput output sentence.Tail)).ToString()
+        | "," | ";" | ":" | "!" | "." | "?" -> ((new StringBuilder()).Append(sentence.Head).Append(sentenceOutput output sentence.Tail)).ToString()
+        | "#START" | "#END" -> sentenceOutput output sentence.Tail
+        | _ -> ((new StringBuilder()).Append(sentence.Head).Append(" ").Append(sentenceOutput output sentence.Tail)).ToString()
 
-let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
+let getNGram(tokenPos : int, n : int, sentence : list<string>) =
     [for i = tokenPos to tokenPos + n - 1 do
         if i < sentence.Length then
             yield sentence[i]
@@ -79,14 +59,14 @@ let GetNGram(tokenPos : int, n : int, sentence : list<string>) =
             yield "#END"
     ]
 
-let CollectSubchains n (sentences : list<list<string>>) =
-    let bar = InitializeBar sentences.Length '*' " sentences preprocessed." true;
+let collectSubchains n (sentences : list<list<string>>) =
+    let bar = initializeBar sentences.Length '*' " sentences preprocessed." true;
     let barProgress = using (bar)
     (
         [for sentence in sentences do
             bar.Tick();
             yield! [for i = 0 to sentence.Length do
-                    yield GetNGram(i, n, sentence)
+                    yield getNGram(i, n, sentence)
             ]
         ]
     );
@@ -96,26 +76,26 @@ type Chained =
     mutable amount: int;
     mutable probability: float;}
 
-    member this.CalculateProbability(overallAmount: float) =
+    member this.calculateProbability(overallAmount: float) =
         this.probability <- (float) this.value.Length / overallAmount;
 
 type Link =
     {mutable joined: list<Chained>;}
 
-    member this.CalculateProbabilities() =
+    member this.calculateProbabilities() =
         let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) this.joined));
         for sequence in this.joined do
-            sequence.CalculateProbability(overallAmount);
+            sequence.calculateProbability(overallAmount);
 
     // TODO 2 : not so random with (span of 0... prob1 ... prob2 (...) probN (...) 1)
-    member this.ReturnRandomWord(seed: Option<int>) =
+    member this.returnRandomWord(seed: Option<int>) =
         if (seed.IsSome) then
             this.joined[Random(seed.Value).Next(0, this.joined.Length)].value
         else
             this.joined[Random().Next(0, this.joined.Length)].value
 
-let GetFullChain(collectedSubchains: list<list<string>>) =
-    let bar = InitializeBar collectedSubchains.Length '*' " subchains preprocessed." true;
+let getFullChain(collectedSubchains: list<list<string>>) =
+    let bar = initializeBar collectedSubchains.Length '*' " subchains preprocessed." true;
     let flow = using (bar)
     (
         [for subchain in collectedSubchains do
@@ -127,13 +107,13 @@ let GetFullChain(collectedSubchains: list<list<string>>) =
 type Chain =
     {mutable links: list<KeyValuePair<string, Link>>;}
 
-    member this.CalculateProbabilitiesForChain() =
+    member this.calculateProbabilitiesForChain() =
         for link in this.links do
-            link.Value.CalculateProbabilities();
+            link.Value.calculateProbabilities();
 
-let GetChain (fullChain: list<KeyValuePair<string, list<string>>>) =
+let getChain (fullChain: list<KeyValuePair<string, list<string>>>) =
     let groupedPairs = fullChain.GroupBy(fun x -> x.Key);
-    let bar = InitializeBar (groupedPairs.Count()) '*' " keys preprocessed" true;
+    let bar = initializeBar (groupedPairs.Count()) '*' " keys preprocessed" true;
     let flow = using (bar)
     (
         let chain = {links = [for group in groupedPairs do
@@ -143,27 +123,26 @@ let GetChain (fullChain: list<KeyValuePair<string, list<string>>>) =
                                                                                     yield {value = infragroup.Key; amount = infragroup.Count(); probability = 0}
                                 ]})
         ]}
-        chain.CalculateProbabilitiesForChain();
+        chain.calculateProbabilitiesForChain();
         chain;
     )
 
 
-let rec Generate finalSentence (seed: Option<int>) (chain : Chain)  =
-    if (String.Equals (Last finalSentence, "#END")) || ([for i in finalSentence do i.Length].Sum() > 286) then
+let rec generate finalSentence (seed: Option<int>) (chain : Chain)  =
+    if (String.Equals (last finalSentence, "#END")) || ([for i in finalSentence do i.Length].Sum() > 286) then
         finalSentence
-    else Generate (finalSentence @ (chain.links.Where(fun x -> x.Key = Last finalSentence).First().Value.ReturnRandomWord(seed))) seed chain;
+    else generate (finalSentence @ (chain.links.Where(fun x -> x.Key = last finalSentence).First().Value.returnRandomWord(seed))) seed chain;
 
 [<EntryPoint>]
 let main argv =
-    UDPipeResponseProcessor
     if (argv.Length > 0 && Directory.Exists(argv[0])) then
-        let NGrams = if argv.Length > 1 then
+        let nGrams = if argv.Length > 1 then
                         match Int32.TryParse argv[1] with
                         | (true, int) -> Some(int).Value
                         | _ -> 2
                         else
                             2
-        printfn "Using %d-grams." NGrams;
+        printfn "Using %d-grams." nGrams;
         let seed = if argv.Length > 2 then
                         match Int32.TryParse argv[2] with
                         | (true, int) -> Some(int)
@@ -171,7 +150,7 @@ let main argv =
                         else
                             None
         if seed.IsSome then printfn "Set seed to %d." seed.Value;
-        printfn "%s" (argv[0] |> loadFiles |> CollectSubchains NGrams |> GetFullChain |> GetChain |> Generate ["#START"] seed |> SentenceOutput "");
+        printfn "%s" (argv[0] |> loadFiles |> collectSubchains nGrams |> getFullChain |> getChain |> generate ["#START"] seed |> sentenceOutput "");
     else
         printfn "%s" "No data provided."
     0
