@@ -10,8 +10,6 @@ open System.IO
 open System.Text
 open FSharp.Data
 open ShellProgressBar
-open System.Net.Http
-open System.Text.Json
 
 let rec last = function
     | hd :: [] -> hd
@@ -19,10 +17,13 @@ let rec last = function
     | _ -> failwith "Empty list."
 
 
+let stringSplit (str : string) (sep:string) = List.ofSeq (str.Split(sep));
+
+
 // TODO: alternative tokenizer and interfacing tokenizer
 // TODO: href/mention deletion
 let tokenize (sentence: string) =
-    "#START" :: List.ofSeq(sentence.Split(" "))
+    "#START" :: List.ofSeq(stringSplit sentence " ")
 
 
 let initializeBar ticks character inscription onBottom =
@@ -32,43 +33,40 @@ let initializeBar ticks character inscription onBottom =
     new ProgressBar(ticks, inscription, options)
 
 
-let loadFiles(dir: string) =
-    let bar = initializeBar (DirectoryInfo(dir).GetFiles().Length) '*' "files loaded" true;
-    let barProgress = using (bar)
+let getFilesFromDir dir  = DirectoryInfo(dir).GetFiles()
+
+let loadFiles (dir: string) =
+    let files = List.ofSeq (getFilesFromDir dir) |> List.filter (fun x -> last (stringSplit x.FullName ".") = "csv");
+    let bar = initializeBar (files.Length) '*' "files loaded" true;
+    let progression = using (bar)
     (
-        [for file in DirectoryInfo(dir).GetFiles() do
-            bar.Tick();
-            if file.FullName.EndsWith(".csv") then
-                yield! (List.ofSeq ((CsvFile.Load(file.FullName).Rows).Select(fun x -> tokenize x[2])))
-        ]
-    );
+        files |> List.ofSeq |> List.map(fun x -> bar.Tick(); (CsvFile.Load(x.FullName).Rows)) |> List.map(fun x -> List.ofSeq (x.Select(fun x -> tokenize x[2]))) |> List.concat
+    )
+
+
+
 
 // TODO: output of parentheses
 let rec sentenceOutput (output : string) (sentence : list<string>) =
-    if sentence.Length = 0 then output else
-        match sentence.Head with
-        | "," | ";" | ":" | "!" | "." | "?" -> ((new StringBuilder()).Append(sentence.Head).Append(sentenceOutput output sentence.Tail)).ToString()
-        | "#START" | "#END" -> sentenceOutput output sentence.Tail
-        | _ -> ((new StringBuilder()).Append(sentence.Head).Append(" ").Append(sentenceOutput output sentence.Tail)).ToString()
+    match sentence.Length with
+        | 0 -> output
+        | _ -> match sentence.Head with
+                    | "," | ";" | ":" | "!" | "." | "?" -> string  ((new StringBuilder()).Append(sentence.Head).Append(sentenceOutput output sentence.Tail))
+                    | "#START" | "#END" -> sentenceOutput output sentence.Tail
+                    | _ -> string ((new StringBuilder()).Append(sentence.Head).Append(" ").Append(sentenceOutput output sentence.Tail))
 
-let getNGram(tokenPos : int, n : int, sentence : list<string>) =
-    [for i = tokenPos to tokenPos + n - 1 do
-        if i < sentence.Length then
-            yield sentence[i]
-        else
-            yield "#END"
-    ]
+let getNGram(tokenPos : int)  (n : int) (sentence : list<string>) =
+    [tokenPos .. (tokenPos + n - 1)] |> List.map (fun x ->
+                                                                match x with
+                                                                    | i when i < sentence.Length -> sentence[i]
+                                                                    | _ -> "#END")
+
 
 let collectSubchains n (sentences : list<list<string>>) =
     let bar = initializeBar sentences.Length '*' " sentences preprocessed." true;
     let barProgress = using (bar)
     (
-        [for sentence in sentences do
-            bar.Tick();
-            yield! [for i = 0 to sentence.Length do
-                    yield getNGram(i, n, sentence)
-            ]
-        ]
+        sentences |> List.map (fun x -> bar.Tick(); [0 .. x.Length] |> List.map(fun y -> getNGram y n x)) |> List.concat
     );
 
 type Chained =
@@ -84,73 +82,66 @@ type Link =
 
     member this.calculateProbabilities() =
         let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) this.joined));
-        for sequence in this.joined do
-            sequence.calculateProbability(overallAmount);
+        this.joined |> List.iter (fun x -> x.calculateProbability(overallAmount))
 
     // TODO 2 : not so random with (span of 0... prob1 ... prob2 (...) probN (...) 1)
     member this.returnRandomWord(seed: Option<int>) =
-        if (seed.IsSome) then
-            this.joined[Random(seed.Value).Next(0, this.joined.Length)].value
-        else
-            this.joined[Random().Next(0, this.joined.Length)].value
+        match seed with
+            | Some seed -> this.joined[Random(seed).Next(0, this.joined.Length)].value
+            | None -> this.joined[Random().Next(0, this.joined.Length)].value
+
 
 let getFullChain(collectedSubchains: list<list<string>>) =
     let bar = initializeBar collectedSubchains.Length '*' " subchains preprocessed." true;
     let flow = using (bar)
     (
-        [for subchain in collectedSubchains do
-            bar.Tick();
-            yield KeyValuePair.Create(subchain.Head, subchain.Tail);
-        ];
+        collectedSubchains |> List.map(fun x -> bar.Tick(); KeyValuePair.Create(x.Head, x.Tail))
     )
 
 type Chain =
     {mutable links: list<KeyValuePair<string, Link>>;}
 
     member this.calculateProbabilitiesForChain() =
-        for link in this.links do
-            link.Value.calculateProbabilities();
+        this.links |> List.iter (fun x -> x.Value.calculateProbabilities())
 
 let getChain (fullChain: list<KeyValuePair<string, list<string>>>) =
     let groupedPairs = fullChain.GroupBy(fun x -> x.Key);
     let bar = initializeBar (groupedPairs.Count()) '*' " keys preprocessed" true;
     let flow = using (bar)
     (
-        let chain = {links = [for group in groupedPairs do
-                                bar.Tick();
-                                let subgroup = group.GroupBy(fun x -> x.Value);
-                                yield KeyValuePair.Create(group.Key, {joined = [for infragroup in subgroup do
-                                                                                    yield {value = infragroup.Key; amount = infragroup.Count(); probability = 0}
-                                ]})
-        ]}
+        let chain = {links = groupedPairs |> List.ofSeq |> List.map(fun group -> bar.Tick();KeyValuePair.Create(group.Key, {joined = group.GroupBy(fun y -> y.Value) |> List.ofSeq |> List.map (fun x -> {value = x.Key; amount = x.Count(); probability = 0})}))}
         chain.calculateProbabilitiesForChain();
         chain;
     )
 
-
 let rec generate finalSentence (seed: Option<int>) (chain : Chain)  =
-    if (String.Equals (last finalSentence, "#END")) || ([for i in finalSentence do i.Length].Sum() > 286) then
-        finalSentence
-    else generate (finalSentence @ (chain.links.Where(fun x -> x.Key = last finalSentence).First().Value.returnRandomWord(seed))) seed chain;
+    match (last finalSentence) with
+        | "#END" -> finalSentence
+        | _ ->
+                match ([for i in finalSentence do i.Length].Sum()) with
+                        |  j when j > 286 -> finalSentence
+                        | _ -> generate (finalSentence @ (chain.links.Where(fun x -> x.Key = last finalSentence).First().Value.returnRandomWord(seed))) seed chain;
 
 [<EntryPoint>]
 let main argv =
-    if (argv.Length > 0 && Directory.Exists(argv[0])) then
-        let nGrams = if argv.Length > 1 then
-                        match Int32.TryParse argv[1] with
-                        | (true, int) -> Some(int).Value
+    let dir = match argv.Length with
+                    | i when i > 0 ->
+                                            match Directory.Exists(argv[0]) with
+                                                | true -> argv[0]
+                                                | false -> "Empty"
+                    | _ -> failwith "No data provided."
+    let nGrams = match argv.Length with
+                        | i when i > 1 ->
+                                                match Int32.TryParse argv[1] with
+                                                | (true, int) -> Some(int).Value
+                                                | _ -> 2
                         | _ -> 2
-                        else
-                            2
-        printfn "Using %d-grams." nGrams;
-        let seed = if argv.Length > 2 then
-                        match Int32.TryParse argv[2] with
-                        | (true, int) -> Some(int)
+    printfn "Using %d-grams." nGrams;
+    let seed = match argv.Length with
+                        | i when i > 2 ->
+                                                match Int32.TryParse argv[2] with
+                                                | (true, int) -> printfn "Set seed to %d." int; Some(int)
+                                                | _ -> None
                         | _ -> None
-                        else
-                            None
-        if seed.IsSome then printfn "Set seed to %d." seed.Value;
-        printfn "%s" (argv[0] |> loadFiles |> collectSubchains nGrams |> getFullChain |> getChain |> generate ["#START"] seed |> sentenceOutput "");
-    else
-        printfn "%s" "No data provided."
+    printfn "%s" (dir|> loadFiles |> collectSubchains nGrams |> getFullChain |> getChain |> generate ["#START"] seed |> sentenceOutput "");
     0
