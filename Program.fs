@@ -78,7 +78,7 @@ type Chained =
         this.probability <- (float) this.value.Length / overallAmount;
 
 type Link =
-    {mutable joined: list<Chained>;}
+    {joined: list<Chained>;}
 
     member this.calculateProbabilities() =
         let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) this.joined));
@@ -99,7 +99,7 @@ let getFullChain(collectedSubchains: list<list<string>>) =
     )
 
 type Chain =
-    {mutable links: list<KeyValuePair<string, Link>>;}
+    {links: list<KeyValuePair<string, Link>>;}
 
     member this.calculateProbabilitiesForChain() =
         this.links |> List.iter (fun x -> x.Value.calculateProbabilities())
