@@ -7,7 +7,6 @@ open System
 open System.Linq
 open System.Collections.Generic
 open System.IO
-open System.Text
 open FSharp.Data
 open ShellProgressBar
 
@@ -51,9 +50,9 @@ let rec sentenceOutput (output : string) (sentence : list<string>) =
     match sentence.Length with
         | 0 -> output
         | _ -> match sentence.Head with
-                    | "," | ";" | ":" | "!" | "." | "?" -> string  ((new StringBuilder()).Append(sentence.Head).Append(sentenceOutput output sentence.Tail))
+                    | "," | ";" | ":" | "!" | "." | "?" -> [sentence.Head; sentenceOutput output sentence.Tail] |> String.concat ""
                     | "#START" | "#END" -> sentenceOutput output sentence.Tail
-                    | _ -> string ((new StringBuilder()).Append(sentence.Head).Append(" ").Append(sentenceOutput output sentence.Tail))
+                    | _ -> [sentence.Head; sentenceOutput output sentence.Tail] |> String.concat " "
 
 let getNGram(tokenPos : int)  (n : int) (sentence : list<string>) =
     [tokenPos .. (tokenPos + n - 1)] |> List.map (fun x ->
@@ -71,24 +70,24 @@ let collectSubchains n (sentences : list<list<string>>) =
 
 type Chained =
     {value: list<string>;
-    mutable amount: int;
-    mutable probability: float;}
+    amount: int;
+    probability: float;}
 
-    member this.calculateProbability(overallAmount: float) =
-        this.probability <- (float) this.value.Length / overallAmount;
+let calculateProbabilityForChained chained overallAmount =
+    {value = chained.value; amount = chained.amount; probability = (float) chained.value.Length / overallAmount};
 
 type Link =
     {joined: list<Chained>;}
-
-    member this.calculateProbabilities() =
-        let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) this.joined));
-        this.joined |> List.iter (fun x -> x.calculateProbability(overallAmount))
 
     // TODO 2 : not so random with (span of 0... prob1 ... prob2 (...) probN (...) 1)
     member this.returnRandomWord(seed: Option<int>) =
         match seed with
             | Some seed -> this.joined[Random(seed).Next(0, this.joined.Length)].value
             | None -> this.joined[Random().Next(0, this.joined.Length)].value
+
+let calculateProbabilitiesForLink link =
+    let overallAmount  = (float) (List.reduce(fun x y -> x + y) (List.map (fun x -> x.value.Length) link.joined));
+    {joined = link.joined |> List.map (fun x -> calculateProbabilityForChained x overallAmount)}
 
 
 let getFullChain(collectedSubchains: list<list<string>>) =
@@ -101,17 +100,15 @@ let getFullChain(collectedSubchains: list<list<string>>) =
 type Chain =
     {links: list<KeyValuePair<string, Link>>;}
 
-    member this.calculateProbabilitiesForChain() =
-        this.links |> List.iter (fun x -> x.Value.calculateProbabilities())
+let calculateProbabilitiesForChain chain =
+    {links = chain.links |> List.map (fun x -> KeyValuePair.Create(x.Key, calculateProbabilitiesForLink x.Value))}
 
 let getChain (fullChain: list<KeyValuePair<string, list<string>>>) =
     let groupedPairs = fullChain.GroupBy(fun x -> x.Key);
     let bar = initializeBar (groupedPairs.Count()) '*' " keys preprocessed" true;
     let flow = using (bar)
     (
-        let chain = {links = groupedPairs |> List.ofSeq |> List.map(fun group -> bar.Tick();KeyValuePair.Create(group.Key, {joined = group.GroupBy(fun y -> y.Value) |> List.ofSeq |> List.map (fun x -> {value = x.Key; amount = x.Count(); probability = 0})}))}
-        chain.calculateProbabilitiesForChain();
-        chain;
+        calculateProbabilitiesForChain {links = groupedPairs |> List.ofSeq |> List.map(fun group -> bar.Tick();KeyValuePair.Create(group.Key, {joined = group.GroupBy(fun y -> y.Value) |> List.ofSeq |> List.map (fun x -> {value = x.Key; amount = x.Count(); probability = 0})}))}
     )
 
 let rec generate finalSentence (seed: Option<int>) (chain : Chain)  =
